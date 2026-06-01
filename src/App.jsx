@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Search, Database, Plus, Filter, Download } from "lucide-react";
 import "./App.css";
+import PoscarViewer from "./PoscarViewer";
 
 const starterRows = [
   {
@@ -23644,6 +23645,7 @@ export default function App() {
   const [sheetFilter, setSheetFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("All");
   const [selected, setSelected] = useState(starterRows[0]);
+  const [activeTab, setActiveTab] = useState("overview");
   const [form, setForm] = useState(emptyRow);
 
   const sheets = useMemo(() => ["All", ...Array.from(new Set(rows.map((row) => row.sourceSheet)))], [rows]);
@@ -23666,6 +23668,13 @@ export default function App() {
     });
     return counts;
   }, [rows]);
+
+  const lowEnergyRows = useMemo(() => {
+    return [...filteredRows]
+      .filter((row) => Number.isFinite(row.relativeEnergyValue))
+      .sort((a, b) => a.relativeEnergyValue - b.relativeEnergyValue)
+      .slice(0, 6);
+  }, [filteredRows]);
 
   function addRow() {
     if (!form.system.trim()) {
@@ -23732,6 +23741,63 @@ export default function App() {
         </button>
       </section>
 
+      <nav className="tabBar">
+        <button className={activeTab === "overview" ? "tabButton active" : "tabButton"} onClick={() => setActiveTab("overview")}>Overview</button>
+        <button className={activeTab === "database" ? "tabButton active" : "tabButton"} onClick={() => setActiveTab("database")}>Database</button>
+        <button className={activeTab === "structure" ? "tabButton active" : "tabButton"} onClick={() => setActiveTab("structure")}>Selected Structure</button>
+        <button className={activeTab === "add" ? "tabButton active" : "tabButton"} onClick={() => setActiveTab("add")}>Add Record</button>
+      </nav>
+
+      {activeTab === "overview" && (
+        <main className="mainScreen">
+          <section className="overviewGrid">
+            <div className="overviewCard large">
+              <span className="eyebrow">Current selection</span>
+              <h2>{selected.system}</h2>
+              <p>{selected.sourceSheet} · {selected.type}</p>
+              <div className="quickFacts">
+                <div><span>Material</span><b>{selected.materialA} / {selected.materialB}</b></div>
+                <div><span>Facet</span><b>{selected.facet || "-"}</b></div>
+                <div><span>Method</span><b>{selected.method || "-"}</b></div>
+                <div><span>Relative E</span><b>{selected.relativeEnergy || "-"}</b></div>
+              </div>
+              <button className="mainButton" onClick={() => setActiveTab("structure")}>Open selected structure</button>
+            </div>
+
+            <div className="overviewCard">
+              <span className="eyebrow">Filtered records</span>
+              <h2>{filteredRows.length}</h2>
+              <p>Records matching the current sheet, type, and search filters.</p>
+              <button className="ghostButton" onClick={() => setActiveTab("database")}>Browse database</button>
+            </div>
+
+            <div className="overviewCard">
+              <span className="eyebrow">Sheets</span>
+              <h2>{sheets.length - 1}</h2>
+              <p>{sheets.filter((s) => s !== "All").join(", ")}</p>
+            </div>
+          </section>
+
+          <section className="panelCard">
+            <div className="sectionHeader">
+              <div>
+                <span className="eyebrow">Lowest relative energy in current filter</span>
+                <h2>Quick comparison</h2>
+              </div>
+            </div>
+            <div className="miniTable">
+              {lowEnergyRows.map((row) => (
+                <button key={row.id} className={selected.id === row.id ? "miniRow active" : "miniRow"} onClick={() => setSelected(row)}>
+                  <span>{row.system}</span>
+                  <b>{row.relativeEnergy}</b>
+                </button>
+              ))}
+            </div>
+          </section>
+        </main>
+      )}
+
+      {activeTab === "database" && (
       <main className="layout">
         <section className="leftPanel">
           <div className="toolbar">
@@ -23811,8 +23877,60 @@ export default function App() {
           </section>
         </aside>
       </main>
+      )}
+
+      {activeTab === "structure" && (
+        <main className="mainScreen">
+          <section className="structureScreen">
+            <div className="structureViewerBox">
+              <span className="eyebrow">Structure viewer</span>
+              <h2>{selected.system}</h2>
+          <PoscarViewer
+  systemName={selected.system}
+poscarFile={selected.poscarFile || `poscars/${selected.system}.POSCAR`}
+/>
+            </div>
+            <div className="detailCard">
+              <h2>Structure details</h2>
+              <Detail label="Sheet" value={selected.sourceSheet} />
+              <Detail label="Structure / adsorbate" value={selected.adsorbate} />
+              <Detail label="Materials" value={`${selected.materialA} / ${selected.materialB}`} />
+              <Detail label="Facet" value={selected.facet} />
+              <Detail label="Supercell / cut" value={selected.supercell} />
+              <Detail label="Method" value={selected.method} />
+              <Detail label="Final DFT energy" value={selected.finalEnergy} />
+              <Detail label="Relative energy" value={selected.relativeEnergy} />
+            </div>
+          </section>
+        </main>
+      )}
+
+      {activeTab === "add" && (
+        <main className="mainScreen">
+          <section className="detailCard addScreen">
+            <h2><Plus size={20} /> Add new record</h2>
+            <div className="formGrid bigForm">
+              <input placeholder="sourceSheet" value={form.sourceSheet} onChange={(e) => setForm({ ...form, sourceSheet: e.target.value })} />
+              <input placeholder="system" value={form.system} onChange={(e) => setForm({ ...form, system: e.target.value })} />
+              <input placeholder="type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} />
+              <input placeholder="materialA" value={form.materialA} onChange={(e) => setForm({ ...form, materialA: e.target.value })} />
+              <input placeholder="materialB" value={form.materialB} onChange={(e) => setForm({ ...form, materialB: e.target.value })} />
+              <input placeholder="facet" value={form.facet} onChange={(e) => setForm({ ...form, facet: e.target.value })} />
+              <input placeholder="supercell" value={form.supercell} onChange={(e) => setForm({ ...form, supercell: e.target.value })} />
+              <input placeholder="adsorbate / structure" value={form.adsorbate} onChange={(e) => setForm({ ...form, adsorbate: e.target.value })} />
+              <input placeholder="method" value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })} />
+              <input placeholder="finalEnergy, e.g. -123.456 eV" value={form.finalEnergy} onChange={(e) => setForm({ ...form, finalEnergy: e.target.value })} />
+              <select value={form.energyType} onChange={(e) => setForm({ ...form, energyType: e.target.value })}>{energyTypeOptions.map((option) => <option key={option}>{option}</option>)}</select>
+              <input placeholder="calculatedEnergy, e.g. -1.25 eV" value={form.calculatedEnergy} onChange={(e) => setForm({ ...form, calculatedEnergy: e.target.value })} />
+              <input placeholder="formula" value={form.formula} onChange={(e) => setForm({ ...form, formula: e.target.value })} />
+              <input placeholder="notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              <button className="mainButton" onClick={addRow}>Add to database</button>
+            </div>
+          </section>
+        </main>
+      )}
     </div>
-  );
+  );Ni_2x2_on_Pt111_2x2
 }
 
 function Detail({ label, value }) {
